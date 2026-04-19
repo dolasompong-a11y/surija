@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสุริยะจักรวาล (Solar System) - สื่อการเรียนรู้</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Three.js for 3D Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #050814;
+            color: #ffffff;
+            overflow: hidden; /* Prevent scrolling, app is full screen */
+        }
+        
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .planet-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .planet-btn:hover, .planet-btn.active {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: rgba(56, 189, 248, 0.5);
+            transform: translateX(5px);
+        }
+
+        /* Custom Scrollbar for info panel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05); 
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.5); 
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.8); 
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- 3D Canvas Background -->
+    <div id="canvas-container"></div>
+
+    <!-- Main UI Layout -->
+    <div class="relative z-10 flex flex-col md:flex-row h-screen w-full pointer-events-none">
+        
+        <!-- Sidebar Navigation (Left) -->
+        <div class="w-full md:w-80 h-auto md:h-full flex flex-col glass-panel md:border-r border-b md:border-b-0 border-white/10 pointer-events-auto shrink-0 z-20">
+            <div class="p-6 border-b border-white/10 bg-black/20">
+                <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">ระบบสุริยะจักรวาล</h1>
+                <p class="text-sm text-slate-400 mt-1">สื่อการเรียนรู้แบบโต้ตอบ 3D</p>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4 space-y-2" id="nav-container">
+                <!-- Navigation Buttons will be generated here -->
+            </div>
+            
+            <div class="p-4 border-t border-white/10 text-xs text-slate-500 text-center bg-black/20">
+                ข้อมูลอ้างอิงจาก NASA & Google <br>
+                ใช้เมาส์หรือนิ้วลากเพื่อหมุนดวงดาว
+            </div>
+        </div>
+
+        <!-- Content Area (Right) -->
+        <div class="flex-1 flex flex-col justify-between p-4 md:p-8 overflow-hidden">
+            <!-- Top Right: Instruction -->
+            <div class="self-end glass-panel px-4 py-2 rounded-full flex items-center gap-2 text-sm text-slate-300 pointer-events-auto">
+                <i data-lucide="mouse-pointer-click" class="w-4 h-4"></i>
+                <span>คลิกและลากเพื่อหมุนดูรอบๆ</span>
+            </div>
+
+            <!-- Bottom Information Panel -->
+            <div class="w-full max-w-3xl glass-panel rounded-2xl p-6 md:p-8 mt-auto pointer-events-auto animate-fade-in" id="info-panel">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+                    <div>
+                        <h2 class="text-4xl md:text-5xl font-bold mb-2" id="planet-name-th">โลก</h2>
+                        <h3 class="text-xl text-blue-400 tracking-wider uppercase font-semibold" id="planet-name-en">Earth</h3>
+                    </div>
+                    <div class="text-left md:text-right">
+                        <span class="inline-block px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-medium" id="planet-type">ดาวเคราะห์หิน</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-black/30 rounded-xl p-4 border border-white/5">
+                        <p class="text-slate-400 text-xs mb-1">ระยะห่างจากดวงอาทิตย์</p>
+                        <p class="font-semibold text-lg" id="stat-distance">149.6 M km</p>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-4 border border-white/5">
+                        <p class="text-slate-400 text-xs mb-1">เส้นผ่านศูนย์กลาง</p>
+                        <p class="font-semibold text-lg" id="stat-size">12,742 km</p>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-4 border border-white/5">
+                        <p class="text-slate-400 text-xs mb-1">เวลาโคจรรอบดวงอาทิตย์</p>
+                        <p class="font-semibold text-lg" id="stat-orbit">365.25 วัน</p>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-4 border border-white/5">
+                        <p class="text-slate-400 text-xs mb-1">จำนวนดวงจันทร์</p>
+                        <p class="font-semibold text-lg" id="stat-moons">1 ดวง</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <h4 class="text-lg font-semibold border-b border-white/10 pb-2">ข้อมูลที่น่าสนใจ</h4>
+                    <p class="text-slate-300 leading-relaxed text-sm md:text-base" id="planet-description">
+                        โลกเป็นดาวเคราะห์ดวงเดียวในระบบสุริยะที่ทราบกันว่ามีสิ่งมีชีวิต มีน้ำปกคลุมพื้นผิวถึง 71% และมีชั้นบรรยากาศที่อุดมไปด้วยไนโตรเจนและออกซิเจน
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // --- 1. DATA SOURCE (ข้อมูลดวงดาว) ---
+        const celestialData = [
+            {
+                id: 'sun',
+                nameTh: 'ดวงอาทิตย์',
+                nameEn: 'The Sun',
+                type: 'ดาวฤกษ์ (Yellow Dwarf)',
+                distance: 'ศูนย์กลาง',
+                size: '1.39 ล้าน กม.',
+                orbit: '-',
+                moons: '0',
+                description: 'ดวงอาทิตย์เป็นดาวฤกษ์ศูนย์กลางของระบบสุริยะ เป็นกลุ่มแก๊สร้อนขนาดใหญ่ที่ให้แสงสว่างและความร้อนแก่ดาวเคราะห์ทุกดวง มวลกว่า 99.8% ของระบบสุริยะรวมอยู่ที่ดวงอาทิตย์',
+                color: 0xffcc00,
+                emissive: 0xffaa00,
+                radius: 4,
+                hasRing: false,
+                atmosphere: true
+            },
+            {
+                id: 'mercury',
+                nameTh: 'ดาวพุธ',
+                nameEn: 'Mercury',
+                type: 'ดาวเคราะห์หิน',
+                distance: '57.9 ล้าน กม.',
+                size: '4,879 กม.',
+                orbit: '88 วัน',
+                moons: '0',
+                description: 'ดาวเคราะห์ที่เล็กที่สุดและอยู่ใกล้ดวงอาทิตย์ที่สุด ไม่มีชั้นบรรยากาศคอยกักเก็บความร้อน ทำให้ตอนกลางวันร้อนจัด (430°C) และตอนกลางคืนหนาวจัด (-180°C) พื้นผิวเต็มไปด้วยหลุมอุกกาบาตคล้ายดวงจันทร์ของเรา',
+                color: 0x888888,
+                emissive: 0x000000,
+                radius: 1.2,
+                hasRing: false,
+                atmosphere: false
+            },
+            {
+                id: 'venus',
+                nameTh: 'ดาวศุกร์',
+                nameEn: 'Venus',
+                type: 'ดาวเคราะห์หิน',
+                distance: '108.2 ล้าน กม.',
+                size: '12,104 กม.',
+                orbit: '225 วัน',
+                moons: '0',
+                description: 'ได้รับฉายาว่า "ฝาแฝดของโลก" เพราะมีขนาดใกล้เคียงกัน แต่สภาพแวดล้อมต่างกันสิ้นเชิง เป็นดาวที่ร้อนที่สุดในระบบสุริยะ (เฉลี่ย 471°C) เนื่องจากมีชั้นบรรยากาศที่หนาทึบไปด้วยก๊าซคาร์บอนไดออกไซด์ ทำให้เกิดภาวะเรือนกระจกขั้นรุนแรง และหมุนรอบตัวเองในทิศตรงกันข้ามกับดาวดวงอื่น',
+                color: 0xe6b800,
+                emissive: 0x221100,
+                radius: 1.8,
+                hasRing: false,
+                atmosphere: true,
+                atmosColor: 0xffd700
+            },
+            {
+                id: 'earth',
+                nameTh: 'โลก',
+                nameEn: 'Earth',
+                type: 'ดาวเคราะห์หิน',
+                distance: '149.6 ล้าน กม.',
+                size: '12,742 กม.',
+                orbit: '365.25 วัน',
+                moons: '1',
+                description: 'ดาวเคราะห์ดวงเดียวที่พบว่ามีสิ่งมีชีวิต พื้นผิวถูกปกคลุมด้วยน้ำถึง 71% มีชั้นบรรยากาศที่เหมาะสม (ไนโตรเจน 78%, ออกซิเจน 21%) และมีสนามแม่เหล็กที่ปกป้องเราจากรังสีอันตรายจากอวกาศ',
+                color: 0x2b82c9,
+                emissive: 0x001133,
+                radius: 2,
+                hasRing: false,
+                atmosphere: true,
+                atmosColor: 0x44aaff
+            },
+            {
+                id: 'mars',
+                nameTh: 'ดาวอังคาร',
+                nameEn: 'Mars',
+                type: 'ดาวเคราะห์หิน',
+                distance: '227.9 ล้าน กม.',
+                size: '6,779 กม.',
+                orbit: '687 วัน',
+                moons: '2',
+                description: 'รู้จักกันในชื่อ "ดาวเคราะห์แดง" เพราะพื้นผิวมีเหล็กออกไซด์ (สนิม) จำนวนมาก มีภูเขาไฟที่ใหญ่ที่สุดในระบบสุริยะชื่อ Olympus Mons และมีหุบเขาลึก Valles Marineris ปัจจุบันนักวิทยาศาสตร์กำลังสำรวจความเป็นไปได้ในการตั้งถิ่นฐาน',
+                color: 0xc1440e,
+                emissive: 0x331100,
+                radius: 1.5,
+                hasRing: false,
+                atmosphere: false
+            },
+            {
+                id: 'jupiter',
+                nameTh: 'ดาวพฤหัสบดี',
+                nameEn: 'Jupiter',
+                type: 'ดาวเคราะห์แก๊สยักษ์',
+                distance: '778.5 ล้าน กม.',
+                size: '139,820 กม.',
+                orbit: '11.9 ปี',
+                moons: '95',
+                description: 'ดาวเคราะห์ที่ใหญ่ที่สุดในระบบสุริยะ สามารถนำโลกไปใส่ได้ถึง 1,300 ใบ เป็นก้อนแก๊สยักษ์ที่ประกอบด้วยไฮโดรเจนและฮีเลียม จุดเด่นคือ "จุดแดงใหญ่" (Great Red Spot) ซึ่งเป็นพายุหมุนขนาดใหญ่กว่าโลกที่พัดมานานนับร้อยปี',
+                color: 0xc88b3a,
+                emissive: 0x221100,
+                radius: 3.5,
+                hasRing: false,
+                atmosphere: true,
+                atmosColor: 0xeebb88
+            },
+            {
+                id: 'saturn',
+                nameTh: 'ดาวเสาร์',
+                nameEn: 'Saturn',
+                type: 'ดาวเคราะห์แก๊สยักษ์',
+                distance: '1,434 ล้าน กม.',
+                size: '116,460 กม.',
+                orbit: '29.5 ปี',
+                moons: '146',
+                description: 'โดดเด่นที่สุดด้วยระบบวงแหวนที่สวยงามและกว้างใหญ่ ซึ่งประกอบไปด้วยก้อนน้ำแข็งและหินนับล้านก้อน ดาวเสาร์มีความหนาแน่นน้อยมาก น้อยกว่าน้ำเสียอีก (หากมีอ่างน้ำที่ใหญ่พอ ดาวเสาร์จะลอยน้ำได้)',
+                color: 0xeaddb9,
+                emissive: 0x222211,
+                radius: 3,
+                hasRing: true,
+                ringColor: 0xcccccc,
+                atmosphere: true,
+                atmosColor: 0xffeedd
+            },
+            {
+                id: 'uranus',
+                nameTh: 'ดาวยูเรนัส',
+                nameEn: 'Uranus',
+                type: 'ดาวเคราะห์น้ำแข็งยักษ์',
+                distance: '2,871 ล้าน กม.',
+                size: '50,724 กม.',
+                orbit: '84 ปี',
+                moons: '27',
+                description: 'ดาวเคราะห์น้ำแข็งยักษ์ที่มีสีฟ้าอมเขียวจากก๊าซมีเทนในชั้นบรรยากาศ ความแปลกคือมีแกนหมุนที่ตะแคงข้างเกือบ 90 องศา (กลิ้งไปตามวงโคจร) ทำให้ฤดูกาลบนดาวนี้ยาวนานและสุดขั้วมาก',
+                color: 0x4b70dd,
+                emissive: 0x001133,
+                radius: 2.5,
+                hasRing: true,
+                ringColor: 0x88aaff,
+                atmosphere: true,
+                atmosColor: 0x66ccff
+            },
+            {
+                id: 'neptune',
+                nameTh: 'ดาวเนปจูน',
+                nameEn: 'Neptune',
+                type: 'ดาวเคราะห์น้ำแข็งยักษ์',
+                distance: '4,495 ล้าน กม.',
+                size: '49,244 กม.',
+                orbit: '165 ปี',
+                moons: '14',
+                description: 'ดาวเคราะห์ที่อยู่ไกลที่สุด เป็นดาวสีน้ำเงินเข้มที่มีกระแสลมแรงที่สุดในระบบสุริยะ (เร็วกว่า 2,000 กม./ชม.) ถูกค้นพบจากการคำนวณทางคณิตศาสตร์ก่อนที่จะใช้กล้องโทรทรรศน์ส่องเห็นจริง',
+                color: 0x274687,
+                emissive: 0x001144,
+                radius: 2.4,
+                hasRing: false,
+                atmosphere: true,
+                atmosColor: 0x3366ff
+            }
+        ];
+
+        let currentIndex = 0; // Start with Earth (index 3) but let's default to Sun (0)
+        
+        // --- 2. UI MANAGEMENT ---
+        function buildNavigation() {
+            const container = document.getElementById('nav-container');
+            container.innerHTML = '';
+            
+            celestialData.forEach((data, index) => {
+                const btn = document.createElement('button');
+                btn.className = `planet-btn w-full text-left p-3 rounded-xl border flex items-center gap-3 ${index === currentIndex ? 'active bg-sky-500/20 border-sky-500/50 text-white' : 'border-transparent text-slate-300 hover:text-white'}`;
+                
+                // Determine icon color
+                let dotColor = `#${data.color.toString(16).padStart(6, '0')}`;
+                if(data.id === 'sun') dotColor = '#FFD700';
+                
+                btn.innerHTML = `
+                    <div class="w-3 h-3 rounded-full shadow-[0_0_8px_${dotColor}]" style="background-color: ${dotColor}"></div>
+                    <div class="flex-1">
+                        <div class="font-medium">${data.nameTh}</div>
+                        <div class="text-xs opacity-60">${data.nameEn}</div>
+                    </div>
+                `;
+                
+                btn.onclick = () => selectPlanet(index);
+                container.appendChild(btn);
+            });
+        }
+
+        function updateInfoPanel() {
+            const data = celestialData[currentIndex];
+            
+            // Update Text
+            document.getElementById('planet-name-th').textContent = data.nameTh;
+            document.getElementById('planet-name-en').textContent = data.nameEn;
+            document.getElementById('planet-type').textContent = data.type;
+            document.getElementById('stat-distance').textContent = data.distance;
+            document.getElementById('stat-size').textContent = data.size;
+            document.getElementById('stat-orbit').textContent = data.orbit;
+            document.getElementById('stat-moons').textContent = data.moons;
+            document.getElementById('planet-description').textContent = data.description;
+
+            // Re-trigger animation
+            const panel = document.getElementById('info-panel');
+            panel.classList.remove('animate-fade-in');
+            void panel.offsetWidth; // trigger reflow
+            panel.classList.add('animate-fade-in');
+
+            // Update Navigation Highlighting
+            const buttons = document.querySelectorAll('.planet-btn');
+            buttons.forEach((btn, idx) => {
+                if (idx === currentIndex) {
+                    btn.classList.add('active', 'bg-sky-500/20', 'border-sky-500/50', 'text-white');
+                    btn.classList.remove('border-transparent', 'text-slate-300');
+                } else {
+                    btn.classList.remove('active', 'bg-sky-500/20', 'border-sky-500/50', 'text-white');
+                    btn.classList.add('border-transparent', 'text-slate-300');
+                }
+            });
+        }
+
+        function selectPlanet(index) {
+            if (currentIndex === index) return;
+            currentIndex = index;
+            updateInfoPanel();
+            createPlanet3D(celestialData[index]);
+        }
+
+        // --- 3. THREE.JS 3D ENGINE ---
+        let scene, camera, renderer, currentPlanetGroup;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let targetRotation = { x: 0, y: 0 };
+        
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050814, 0.02);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            updateCameraPosition();
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xffffff, 1.5, 100);
+            pointLight.position.set(10, 10, 10);
+            scene.add(pointLight);
+
+            // Backlight for edge glow effect
+            const backLight = new THREE.PointLight(0x444455, 1, 100);
+            backLight.position.set(-10, -5, -10);
+            scene.add(backLight);
+
+            // Background Stars
+            createStars();
+
+            // Setup Interaction
+            setupInteraction();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Start loop
+            animate3D();
+        }
+
+        function createStars() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starsCount = 2000;
+            const posArray = new Float32Array(starsCount * 3);
+            
+            for(let i = 0; i < starsCount * 3; i++) {
+                // Spread stars wide
+                posArray[i] = (Math.random() - 0.5) * 100;
+            }
+            
+            starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            
+            const starsMaterial = new THREE.PointsMaterial({
+                size: 0.05,
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true
+            });
+            
+            const starMesh = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(starMesh);
+        }
+
+        function createPlanet3D(data) {
+            // Remove old planet if exists
+            if (currentPlanetGroup) {
+                scene.remove(currentPlanetGroup);
+                // Clean up memory
+                currentPlanetGroup.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+
+            currentPlanetGroup = new THREE.Group();
+            targetRotation = { x: 0, y: 0 }; // Reset rotation
+            currentPlanetGroup.rotation.x = 0.2; // Slight tilt
+
+            // 1. Main Sphere
+            const geometry = new THREE.SphereGeometry(data.radius, 64, 64);
+            
+            // Procedural stylized material
+            const material = new THREE.MeshStandardMaterial({
+                color: data.color,
+                emissive: data.emissive,
+                emissiveIntensity: data.id === 'sun' ? 0.8 : 0.2,
+                roughness: 0.7,
+                metalness: 0.1,
+                wireframe: false
+            });
+
+            // If it's the Sun, make it basic so it glows uniformly without dark shadows
+            if(data.id === 'sun') {
+                 material.roughness = 1;
+                 material.metalness = 0;
+            }
+
+            const planetMesh = new THREE.Mesh(geometry, material);
+            currentPlanetGroup.add(planetMesh);
+
+            // 2. Rings (Saturn / Uranus)
+            if (data.hasRing) {
+                const innerRadius = data.radius * 1.3;
+                const outerRadius = data.radius * 2.2;
+                const ringGeometry = new THREE.RingGeometry(innerRadius, outerRadius, 64);
+                
+                // Adjust UVs for circular mapping if needed, but basic color works for flat style
+                const ringMaterial = new THREE.MeshStandardMaterial({
+                    color: data.ringColor,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.7,
+                    roughness: 0.5
+                });
+
+                const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+                // Rotate ring to lay flat around the planet
+                ringMesh.rotation.x = Math.PI / 2; 
+                
+                // Uranus has extreme tilt
+                if(data.id === 'uranus') {
+                    currentPlanetGroup.rotation.x = Math.PI / 2;
+                } else {
+                    currentPlanetGroup.rotation.x = 0.4; // Saturn tilt
+                }
+
+                currentPlanetGroup.add(ringMesh);
+            }
+
+            // 3. Atmosphere Glow
+            if (data.atmosphere) {
+                const atmosGeometry = new THREE.SphereGeometry(data.radius * 1.05, 32, 32);
+                const atmosMaterial = new THREE.MeshBasicMaterial({
+                    color: data.id === 'sun' ? 0xffbb00 : (data.atmosColor || 0xffffff),
+                    transparent: true,
+                    opacity: data.id === 'sun' ? 0.3 : 0.15,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.BackSide
+                });
+                const atmosMesh = new THREE.Mesh(atmosGeometry, atmosMaterial);
+                currentPlanetGroup.add(atmosMesh);
+
+                // Add an outer halo for the Sun
+                if (data.id === 'sun') {
+                    const haloGeometry = new THREE.SphereGeometry(data.radius * 1.2, 32, 32);
+                    const haloMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xff6600,
+                        transparent: true,
+                        opacity: 0.1,
+                        blending: THREE.AdditiveBlending,
+                        side: THREE.BackSide
+                    });
+                    const haloMesh = new THREE.Mesh(haloGeometry, haloMaterial);
+                    currentPlanetGroup.add(haloMesh);
+                }
+            }
+
+            scene.add(currentPlanetGroup);
+            
+            // Intro animation effect
+            currentPlanetGroup.scale.set(0.1, 0.1, 0.1);
+        }
+
+        function setupInteraction() {
+            const container = document.getElementById('canvas-container');
+
+            const startDrag = (e) => {
+                isDragging = true;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                previousMousePosition = { x: clientX, y: clientY };
+            };
+
+            const moveDrag = (e) => {
+                if (!isDragging) return;
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                const deltaMove = {
+                    x: clientX - previousMousePosition.x,
+                    y: clientY - previousMousePosition.y
+                };
+
+                targetRotation.y += deltaMove.x * 0.01;
+                targetRotation.x += deltaMove.y * 0.01;
+
+                previousMousePosition = { x: clientX, y: clientY };
+            };
+
+            const endDrag = () => {
+                isDragging = false;
+            };
+
+            // Mouse events
+            container.addEventListener('mousedown', startDrag);
+            window.addEventListener('mousemove', moveDrag);
+            window.addEventListener('mouseup', endDrag);
+
+            // Touch events
+            container.addEventListener('touchstart', startDrag, {passive: true});
+            window.addEventListener('touchmove', moveDrag, {passive: true});
+            window.addEventListener('touchend', endDrag);
+        }
+
+        function updateCameraPosition() {
+            // Adjust camera distance based on screen width
+            const isMobile = window.innerWidth < 768;
+            camera.position.z = isMobile ? 18 : 12;
+            
+            // Shift camera right on desktop to leave room for sidebar
+            if(!isMobile) {
+                camera.position.x = 2;
+            } else {
+                camera.position.x = 0;
+                camera.position.y = 2; // Shift up slightly on mobile
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            updateCameraPosition();
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+
+            if (currentPlanetGroup) {
+                // Scale animation on load
+                if (currentPlanetGroup.scale.x < 1) {
+                    currentPlanetGroup.scale.x += (1 - currentPlanetGroup.scale.x) * 0.1;
+                    currentPlanetGroup.scale.y += (1 - currentPlanetGroup.scale.y) * 0.1;
+                    currentPlanetGroup.scale.z += (1 - currentPlanetGroup.scale.z) * 0.1;
+                }
+
+                // Automatic slow rotation
+                currentPlanetGroup.rotation.y += 0.002;
+
+                // Manual interaction rotation (smoothing)
+                if (currentPlanetGroup.rotation.x !== targetRotation.x) {
+                    // Limit X rotation
+                    targetRotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotation.x));
+                    currentPlanetGroup.rotation.x += (targetRotation.x - currentPlanetGroup.rotation.x) * 0.1;
+                }
+                
+                // Apply manual Y rotation on top of auto rotation
+                currentPlanetGroup.rotation.y += targetRotation.y * 0.1;
+                targetRotation.y *= 0.9; // damping
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- 4. BOOTSTRAP ---
+        window.onload = () => {
+            // Set Earth (index 3) as default for familiar starting point
+            currentIndex = 3; 
+            buildNavigation();
+            init3D();
+            updateInfoPanel();
+            createPlanet3D(celestialData[currentIndex]);
+        };
+
+    </script>
+</body>
+</html>
